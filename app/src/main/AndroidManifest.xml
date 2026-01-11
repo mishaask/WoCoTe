@@ -59,5 +59,27 @@
             android:name=".ui.manager.CompleteManagerProfileActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.manager.EditEmployeeProfileActivity"
+            android:exported="false"/>
+        <activity
+            android:name=".ui.manager.TeamsActivity"
+            android:exported="false"/>
+        <activity
+            android:name=".ui.manager.EditTeamActivity"
+            android:exported="false"/>
+        <activity
+            android:name=".ui.employee.MyShiftsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.manager.ScheduleShiftsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.manager.ManageShiftTemplatesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.employee.MyAvailabilityActivity"
+            android:exported="false" />
+
     </application>
 </manifest>

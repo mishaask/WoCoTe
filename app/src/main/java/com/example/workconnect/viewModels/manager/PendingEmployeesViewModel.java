@@ -5,10 +5,12 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import com.example.workconnect.models.enums.RegisterStatus;
+import com.example.workconnect.models.Team;
 import com.example.workconnect.models.User;
+import com.example.workconnect.models.enums.RegisterStatus;
 import com.example.workconnect.models.enums.Roles;
 import com.example.workconnect.repository.EmployeeRepository;
+import com.example.workconnect.repository.TeamRepository;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
@@ -19,14 +21,17 @@ import java.util.List;
  */
 public class PendingEmployeesViewModel extends ViewModel {
 
-    private final MutableLiveData<List<User>> pendingEmployees =
-            new MutableLiveData<>();
+    private final MutableLiveData<List<User>> pendingEmployees = new MutableLiveData<>();
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
 
-    private final EmployeeRepository repository = new EmployeeRepository();
+    private final EmployeeRepository employeeRepository = new EmployeeRepository();
+    private final TeamRepository teamRepository = new TeamRepository();
+
     private ListenerRegistration listenerRegistration;
     private boolean initialized = false;
+
+    private LiveData<List<Team>> teamsLiveData;
 
     public LiveData<List<User>> getPendingEmployees() {
         return pendingEmployees;
@@ -41,7 +46,18 @@ public class PendingEmployeesViewModel extends ViewModel {
     }
 
     /**
-     * Start listening only once (even if Activity/Fragment is recreated)
+     * Teams list for the approval dialog spinner.
+     * NOTE: this expects TeamRepository.listenTeamsForCompany(companyId) to exist.
+     */
+    public LiveData<List<Team>> getTeamsForCompany(String companyId) {
+        if (teamsLiveData == null) {
+            teamsLiveData = teamRepository.getTeamsForCompany(companyId);
+        }
+        return teamsLiveData;
+    }
+
+    /**
+     * Start listening only once (even if Activity is recreated)
      */
     public void startListening(String companyId) {
         if (initialized) return;
@@ -49,7 +65,7 @@ public class PendingEmployeesViewModel extends ViewModel {
 
         isLoading.setValue(true);
 
-        listenerRegistration = repository.listenForPendingEmployees(
+        listenerRegistration = employeeRepository.listenForPendingEmployees(
                 companyId,
                 new EmployeeRepository.PendingEmployeesCallback() {
                     @Override
@@ -69,25 +85,27 @@ public class PendingEmployeesViewModel extends ViewModel {
 
     /**
      * Approve employee with full details – role, manager, vacation accrual etc.
+     * team is REMOVED; we now pass optional selectedTeamId + employmentType.
      */
-    // PendingEmployeesViewModel.java
     public void approveEmployee(
             String uid,
-            Roles role,                          // "EMPLOYEE" or "MANAGER"
-            @Nullable String directManagerEmail,  // email (null/empty for top-level manager)
+            Roles role,
+            @Nullable String directManagerEmail,
             Double vacationDaysPerMonth,
             String department,
-            String team,
-            String jobTitle
+            String jobTitle,
+            @Nullable String selectedTeamId,
+            @Nullable String employmentType
     ) {
-        repository.approveEmployeeWithDetailsByManagerEmail(
+        employeeRepository.approveEmployeeWithDetailsByManagerEmail(
                 uid,
                 role,
                 directManagerEmail,
                 vacationDaysPerMonth,
                 department,
-                team,
                 jobTitle,
+                selectedTeamId,
+                employmentType,
                 (success, msg) -> {
                     if (!success) {
                         errorMessage.postValue(msg);
@@ -96,12 +114,11 @@ public class PendingEmployeesViewModel extends ViewModel {
         );
     }
 
-
     /**
      * Reject employee (status = "rejected")
      */
     public void rejectEmployee(String uid) {
-        repository.updateEmployeeStatus(uid, RegisterStatus.REJECTED, (success, msg) -> {
+        employeeRepository.updateEmployeeStatus(uid, RegisterStatus.REJECTED, (success, msg) -> {
             if (!success) {
                 errorMessage.postValue(msg);
             }

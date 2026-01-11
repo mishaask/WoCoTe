@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
@@ -280,23 +281,56 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Management Row 3 -->
+
         <Button
             android:id="@+id/btn_salary_slips"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Upload salary slips"
-            android:backgroundTint="@color/primaryBlue"
-            android:textColor="@color/white"
-            android:textAllCaps="false"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="6dp"
-            android:maxLines="1"
+            android:backgroundTint="@color/primaryBlue"
             android:ellipsize="end"
+            android:maxLines="1"
             android:minHeight="48dp"
             android:paddingHorizontal="12dp"
-            app:layout_constraintTop_toBottomOf="@id/btn_manage_attendance"
+            android:text="Upload salary slips"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            app:layout_constraintEnd_toStartOf="@id/btn_company_settings"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/btn_company_settings" />
+            app:layout_constraintTop_toBottomOf="@id/btn_manage_attendance" />
+
+        <Button
+            android:id="@+id/btn_teams"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="6dp"
+            android:text="Teams"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/primaryBlue"
+            android:textColor="@color/white"
+            android:minHeight="48dp"
+            android:paddingHorizontal="12dp"
+            app:layout_constraintTop_toBottomOf="@id/btn_salary_slips"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btn_edit_employee_profile" />
+
+        <Button
+            android:id="@+id/btn_edit_employee_profile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginStart="6dp"
+            android:text="Edit employee profile"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/primaryBlue"
+            android:textColor="@color/white"
+            android:minHeight="48dp"
+            android:paddingHorizontal="12dp"
+            app:layout_constraintTop_toBottomOf="@id/btn_salary_slips"
+            app:layout_constraintStart_toEndOf="@id/btn_teams"
+            app:layout_constraintEnd_toEndOf="parent" />
 
         <Button
             android:id="@+id/btn_company_settings"

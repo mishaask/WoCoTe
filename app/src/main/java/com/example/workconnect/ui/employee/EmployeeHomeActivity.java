@@ -4,8 +4,10 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import com.example.workconnect.ui.employee.MyShiftsActivity;
 
 import com.example.workconnect.R;
 import com.example.workconnect.ui.auth.LoginActivity;
@@ -143,9 +145,10 @@ public class EmployeeHomeActivity extends AppCompatActivity {
             // startActivity(new Intent(this, MyAttendanceActivity.class));
         });
 
-        btnMyShifts.setOnClickListener(v -> {
-            // TODO: startActivity(new Intent(this, MyShiftsActivity.class));
-        });
+        btnMyShifts.setOnClickListener(v -> openMyShiftsOrFullTime());
+
+
+
 
         btnVacationRequests.setOnClickListener(v -> {
             Intent intent = new Intent(this, VacationRequestsActivity.class);
@@ -175,4 +178,29 @@ public class EmployeeHomeActivity extends AppCompatActivity {
             finish();
         });
     }
+    private void openMyShiftsOrFullTime() {
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
+            Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    String companyId = doc.getString("companyId");
+                    String employmentType = doc.getString("employmentType"); // "FULL_TIME" / "SHIFT_BASED" / null
+
+                    Intent i = new Intent(this, MyShiftsActivity.class);
+                    i.putExtra("companyId", companyId == null ? "" : companyId);
+                    startActivity(i);
+
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
+                );
+    }
+
 }

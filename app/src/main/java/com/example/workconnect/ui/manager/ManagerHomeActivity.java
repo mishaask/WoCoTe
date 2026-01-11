@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.example.workconnect.ui.manager.ManageShiftTemplatesActivity;
+import com.example.workconnect.ui.employee.MyShiftsActivity;
 
 import com.example.workconnect.R;
 import com.example.workconnect.ui.auth.LoginActivity;
@@ -22,6 +24,8 @@ public class ManagerHomeActivity extends AppCompatActivity {
 
     // Top
     private Button btnLogout;
+
+    private Button btnEditEmployeeProfile, btnTeams;
 
     // ===== My area =====
     private Button btnAttendance, btnMyShifts, btnMyVacations, btnMyTasks, btnChat, btnVideoCalls, btnMyProfile;
@@ -76,6 +80,9 @@ public class ManagerHomeActivity extends AppCompatActivity {
         btnManageShifts = findViewById(R.id.btn_manage_shifts);
         btnSalarySlips = findViewById(R.id.btn_salary_slips);
         btnCompanySettings = findViewById(R.id.btn_company_settings);
+        btnEditEmployeeProfile = findViewById(R.id.btn_edit_employee_profile);
+        btnTeams = findViewById(R.id.btn_teams);
+
     }
 
     private void setClickListeners() {
@@ -97,10 +104,9 @@ public class ManagerHomeActivity extends AppCompatActivity {
             Toast.makeText(this, "TODO: Attendance screen", Toast.LENGTH_SHORT).show();
         });
 
-        btnMyShifts.setOnClickListener(v -> {
-            // TODO: startActivity(new Intent(this, MyShiftsActivity.class));
-            Toast.makeText(this, "TODO: My shifts screen", Toast.LENGTH_SHORT).show();
-        });
+        btnMyShifts.setOnClickListener(v -> openMyShiftsOrFullTime());
+
+
 
         btnMyVacations.setOnClickListener(v -> {
             // אם VacationRequestsActivity מיועד רק לעובד – תשני למסך של "My vacations" אצלך
@@ -150,9 +156,11 @@ public class ManagerHomeActivity extends AppCompatActivity {
         });
 
         btnManageShifts.setOnClickListener(v -> {
-            // TODO: startActivity(new Intent(this, ManageShiftsActivity.class).putExtra("companyId", companyId));
-            Toast.makeText(this, "TODO: Manage shifts screen", Toast.LENGTH_SHORT).show();
+            Intent i = new Intent(this, ScheduleShiftsActivity.class);
+            i.putExtra("companyId", companyId);
+            startActivity(i);
         });
+
 
         btnSalarySlips.setOnClickListener(v -> {
             // TODO: startActivity(new Intent(this, ManageSalarySlipsActivity.class).putExtra("companyId", companyId));
@@ -163,6 +171,11 @@ public class ManagerHomeActivity extends AppCompatActivity {
             // TODO: startActivity(new Intent(this, CompanySettingsActivity.class).putExtra("companyId", companyId));
             Toast.makeText(this, "TODO: Company settings screen", Toast.LENGTH_SHORT).show();
         });
+
+        btnEditEmployeeProfile.setOnClickListener(v -> openWithCompany(EditEmployeeProfileActivity.class));
+
+        btnTeams.setOnClickListener(v -> openWithCompany(TeamsActivity.class));
+
     }
 
     /**
@@ -251,4 +264,29 @@ public class ManagerHomeActivity extends AppCompatActivity {
                         tvCompanyName.setText("Company: " + companyId)
                 );
     }
+    private void openMyShiftsOrFullTime() {
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
+            Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    String companyId = doc.getString("companyId");
+                    String employmentType = doc.getString("employmentType"); // "FULL_TIME" / "SHIFT_BASED" / null
+
+                    Intent i = new Intent(this, MyShiftsActivity.class);
+                    i.putExtra("companyId", companyId == null ? "" : companyId);
+                    startActivity(i);
+
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
+                );
+    }
+
 }

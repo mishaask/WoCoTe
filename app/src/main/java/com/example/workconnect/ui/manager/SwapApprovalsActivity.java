@@ -5,6 +5,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,6 +26,7 @@ public class SwapApprovalsActivity extends AppCompatActivity {
 
     private Spinner spinnerTeam;
     private RecyclerView rv;
+    private TextView tvEmpty;
 
     private final TeamRepository teamRepo = new TeamRepository();
     private final ShiftSwapRepository swapRepo = new ShiftSwapRepository();
@@ -45,9 +47,17 @@ public class SwapApprovalsActivity extends AppCompatActivity {
 
         companyId = getIntent().getStringExtra("companyId");
         if (companyId == null) companyId = "";
+        companyId = companyId.trim();
+
+        if (companyId.isEmpty()) {
+            Toast.makeText(this, "Missing companyId (SwapApprovalsActivity)", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         spinnerTeam = findViewById(R.id.spinner_team);
         rv = findViewById(R.id.rv_pending);
+        tvEmpty = findViewById(R.id.tv_empty);
 
         adapter = new SwapApprovalsAdapter(new SwapApprovalsAdapter.Listener() {
             @Override
@@ -106,6 +116,7 @@ public class SwapApprovalsActivity extends AppCompatActivity {
                     if (position == 0) {
                         selectedTeamId = null;
                         adapter.setItems(new ArrayList<>());
+                        tvEmpty.setVisibility(View.VISIBLE);
                         return;
                     }
 
@@ -122,6 +133,10 @@ public class SwapApprovalsActivity extends AppCompatActivity {
         if (selectedTeamId == null) return;
 
         swapRepo.listenPendingApprovals(companyId, selectedTeamId)
-                .observe(this, list -> adapter.setItems(list));
+                .observe(this, list -> {
+                    if (list == null) list = new ArrayList<>();
+                    adapter.setItems(list);
+                    tvEmpty.setVisibility(list.isEmpty() ? View.VISIBLE : View.GONE);
+                });
     }
 }

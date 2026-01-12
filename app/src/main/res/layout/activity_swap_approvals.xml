@@ -8,7 +8,6 @@
     android:paddingTop="24dp"
     android:paddingBottom="16dp">
 
-    <!-- Top bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -41,11 +40,22 @@
         android:layout_marginTop="8dp"
         android:minHeight="48dp" />
 
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No pending approvals."
+        android:visibility="gone"
+        android:paddingTop="12dp"
+        android:textStyle="bold" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_pending"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="12dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="vertical" />
 
 </LinearLayout>

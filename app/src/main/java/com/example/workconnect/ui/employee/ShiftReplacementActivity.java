@@ -41,6 +41,12 @@ public class ShiftReplacementActivity extends AppCompatActivity {
     private RecyclerView rvMy, rvOpen;
     private Button btnNew;
 
+    // NEW UI pieces for collapsible "Your Requests"
+    private View headerMy;
+    private ImageButton btnToggleMy;
+    private View mySectionContainer;
+    private boolean myExpanded = true;
+
     private final TeamRepository teamRepo = new TeamRepository();
     private final ShiftSwapRepository swapRepo = new ShiftSwapRepository();
 
@@ -49,6 +55,9 @@ public class ShiftReplacementActivity extends AppCompatActivity {
 
     private MyRequestsAdapter myAdapter;
     private OpenRequestsAdapter openAdapter;
+
+    // Track my requests (for quick duplicate checks in UI)
+    private final List<ShiftSwapRequest> myRequestsCache = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,9 +76,18 @@ public class ShiftReplacementActivity extends AppCompatActivity {
         }
 
         spinnerTeam = findViewById(R.id.spinner_team);
-        rvMy = findViewById(R.id.rv_my);
+        rvMy = findViewById(R.id.rv_my_requests);
         rvOpen = findViewById(R.id.rv_open);
         btnNew = findViewById(R.id.btn_new_request);
+
+        // Collapsible section views (from the new XML below)
+        headerMy = findViewById(R.id.header_my_requests);
+        btnToggleMy = findViewById(R.id.btn_toggle_my);
+        mySectionContainer = findViewById(R.id.container_my_requests);
+
+        View.OnClickListener toggle = v -> toggleMySection();
+        headerMy.setOnClickListener(toggle);
+        btnToggleMy.setOnClickListener(toggle);
 
         myAdapter = new MyRequestsAdapter(new MyRequestsAdapter.Listener() {
             @Override public void onCancel(ShiftSwapRequest r) {
@@ -109,6 +127,12 @@ public class ShiftReplacementActivity extends AppCompatActivity {
         bindTeams();
     }
 
+    private void toggleMySection() {
+        myExpanded = !myExpanded;
+        mySectionContainer.setVisibility(myExpanded ? View.VISIBLE : View.GONE);
+        btnToggleMy.setImageResource(myExpanded ? android.R.drawable.arrow_up_float : android.R.drawable.arrow_down_float);
+    }
+
     private void bindTeams() {
         teamRepo.getTeamsForCompany(companyId).observe(this, teams -> {
             cachedTeams.clear();
@@ -129,6 +153,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                         selectedTeamId = null;
                         myAdapter.setItems(new ArrayList<>());
                         openAdapter.setItems(new ArrayList<>());
+                        myRequestsCache.clear();
                         return;
                     }
                     selectedTeamId = cachedTeams.get(position - 1).getId();
@@ -144,7 +169,12 @@ public class ShiftReplacementActivity extends AppCompatActivity {
         if (selectedTeamId == null) return;
 
         swapRepo.listenMyRequests(companyId, selectedTeamId, myUid).observe(this, list -> {
-            myAdapter.setItems(expireIfNeeded(list));
+            List<ShiftSwapRequest> processed = expireIfNeeded(list);
+
+            myRequestsCache.clear();
+            if (processed != null) myRequestsCache.addAll(processed);
+
+            myAdapter.setItems(processed);
         });
 
         swapRepo.listenOpenRequests(companyId, selectedTeamId, myUid).observe(this, list -> {
@@ -170,6 +200,21 @@ public class ShiftReplacementActivity extends AppCompatActivity {
             out.add(r);
         }
         return out;
+    }
+
+    private boolean hasDuplicateMyRequest(String type, String dateKey, String templateId) {
+        for (ShiftSwapRequest existing : myRequestsCache) {
+            if (existing == null) continue;
+            if (!TextUtils.equals(existing.getType(), type)) continue;
+            if (!TextUtils.equals(existing.getDateKey(), dateKey)) continue;
+            if (!TextUtils.equals(existing.getTemplateId(), templateId)) continue;
+
+            String st = existing.getStatus();
+            if (ShiftSwapRequest.OPEN.equals(st) || ShiftSwapRequest.PENDING_APPROVAL.equals(st)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void showCreateRequestDialog() {
@@ -223,6 +268,12 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                 String type = (String) spType.getSelectedItem();
                 if (TextUtils.isEmpty(type)) type = ShiftSwapRequest.GIVE_UP;
 
+                // UI-level duplicate check (fast)
+                if (hasDuplicateMyRequest(type, chosen.dateKey, chosen.templateId)) {
+                    Toast.makeText(this, "You already submitted this request for this shift", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 ShiftSwapRequest r = new ShiftSwapRequest();
                 r.setDateKey(chosen.dateKey);
                 r.setTemplateId(chosen.templateId);
@@ -245,12 +296,9 @@ public class ShiftReplacementActivity extends AppCompatActivity {
     private void showMakeOfferDialog(ShiftSwapRequest r) {
         if (r == null || selectedTeamId == null) return;
 
-        // -------------------------
         // GIVE_UP: only if FREE that day + auto-send to manager approval
-        // -------------------------
         if (ShiftSwapRequest.GIVE_UP.equals(r.getType())) {
 
-            // MUST be free that day (in this team)
             swapRepo.hasMyShiftOnDate(companyId, selectedTeamId, r.getDateKey(), myUid, (ok, msg) -> {
                 if (!ok) {
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
@@ -273,12 +321,12 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                             o.setOfferedTemplateId(null);
                             o.setOfferedTemplateTitle(null);
 
-                            // Create offer
                             swapRepo.makeOffer(companyId, selectedTeamId, r.getId(), o, (ok2, msg2) -> {
                                 Toast.makeText(this, msg2, Toast.LENGTH_SHORT).show();
                                 if (!ok2) return;
 
-                                // AUTO submit to manager approval (so it shows in SwapApprovals)
+                                // Important: we need the offerId. makeOffer() sets o.id before write.
+                                // It will be non-null here because we set it before doc.set in repo.
                                 swapRepo.submitForApproval(companyId, selectedTeamId, r.getId(), o.getId(), (ok3, msg3) -> {
                                     if (!TextUtils.isEmpty(msg3)) {
                                         Toast.makeText(this, msg3, Toast.LENGTH_SHORT).show();
@@ -292,9 +340,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
             return;
         }
 
-        // -------------------------
-        // SWAP: picker of MY upcoming shifts (no manual typing)
-        // -------------------------
+        // SWAP: picker of MY upcoming shifts
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_make_offer_swap, null);
 
         RecyclerView rv = view.findViewById(R.id.rv_upcoming_shifts);
@@ -315,15 +361,11 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                 .setPositiveButton("Offer", null)
                 .create();
 
-        // Load upcoming shifts for this user
         swapRepo.listenMyUpcomingShifts(
                 companyId,
                 java.util.Collections.singletonList(selectedTeamId),
                 myUid
         ).observe(this, list -> {
-            // Filter out:
-            // - same day as request (must be different day)
-            // - anything not strictly future (repo already does future, but keep safe)
             List<ShiftSwapRepository.UpcomingShift> filtered = new ArrayList<>();
             String today = todayKey();
 
@@ -350,7 +392,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                     return;
                 }
 
-                // extra sanity checks
                 if (chosen.dateKey.compareTo(todayKey()) <= 0) {
                     Toast.makeText(this, "Offered shift must be future", Toast.LENGTH_SHORT).show();
                     return;
@@ -382,7 +423,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
         return (s == null ? "" : s);
     }
 
-    /** Minimal RecyclerView picker inside the dialog (no extra XML row file needed). */
+    /** Minimal RecyclerView picker inside the dialog. */
     private static class UpcomingShiftPickerAdapter extends RecyclerView.Adapter<UpcomingShiftPickerAdapter.VH> {
 
         interface OnPick {

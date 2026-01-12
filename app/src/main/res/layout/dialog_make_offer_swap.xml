@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/et_offer_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Your offered shift date (tap to pick)"
+        android:focusable="false" />
+
+    <EditText
+        android:id="@+id/et_offer_template_id"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Your template ID (required)"
+        android:layout_marginTop="10dp"/>
+
+    <EditText
+        android:id="@+id/et_offer_template_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Your template title (optional)"
+        android:layout_marginTop="8dp"/>
+</LinearLayout>

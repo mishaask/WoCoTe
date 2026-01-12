@@ -80,6 +80,15 @@
         <activity
             android:name=".ui.employee.MyAvailabilityActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.employee.ShiftReplacementActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.manager.SwapApprovalsActivity"
+            android:exported="false"/>
+
+
 
     </application>
 </manifest>

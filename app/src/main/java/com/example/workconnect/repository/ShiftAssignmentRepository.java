@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,66 +74,90 @@ public class ShiftAssignmentRepository {
             return;
         }
 
-        var itemsCol = db.collection("companies").document(companyId)
+        DocumentReference dayDoc = db.collection("companies").document(companyId)
                 .collection("teams").document(teamId)
-                .collection("assignments").document(dateKey)
-                .collection("items");
+                .collection("assignments").document(dateKey);
 
-        itemsCol.get().addOnSuccessListener(allSnap -> {
-            var batch = db.batch();
+        com.google.firebase.firestore.CollectionReference itemsCol = dayDoc.collection("items");
 
-            // Build map userId -> existing assignment
-            HashMap<String, ShiftAssignment> existing = new HashMap<>();
-            for (DocumentSnapshot doc : allSnap.getDocuments()) {
-                ShiftAssignment a = doc.toObject(ShiftAssignment.class);
-                if (a != null) {
-                    String uid = a.getUserId();
-                    if (uid == null || uid.trim().isEmpty()) uid = doc.getId();
-                    a.setUserId(uid);
-                    existing.put(uid, a);
-                }
-            }
+        // 1) Read existing items for this day so we can delete unselected + move users
+        itemsCol.get()
+                .addOnSuccessListener(allSnap -> {
 
-            // Normalize selected list
-            List<String> selected = new ArrayList<>();
-            if (selectedUserIds != null) {
-                for (String uid : selectedUserIds) {
-                    if (uid != null && !uid.trim().isEmpty()) selected.add(uid.trim());
-                }
-            }
+                    com.google.firebase.firestore.WriteBatch batch = db.batch();
 
-            // 1) Delete users that were on THIS template but are now unselected
-            for (String uid : existing.keySet()) {
-                ShiftAssignment a = existing.get(uid);
-                if (a == null) continue;
+                    // 2) ✅ Ensure parent date doc exists (THIS is the critical fix)
+                    HashMap<String, Object> header = new HashMap<>();
+                    header.put("dateKey", dateKey);
+                    header.put("updatedAt", System.currentTimeMillis());
+                    batch.set(dayDoc, header, SetOptions.merge());
 
-                boolean wasOnThisTemplate = template.getId().equals(a.getTemplateId());
-                boolean stillSelected = selected.contains(uid);
+                    // 3) Build map userId -> existing assignment
+                    HashMap<String, ShiftAssignment> existing = new HashMap<>();
+                    for (DocumentSnapshot doc : allSnap.getDocuments()) {
+                        ShiftAssignment a = doc.toObject(ShiftAssignment.class);
+                        if (a != null) {
+                            String uid = a.getUserId();
+                            if (uid == null || uid.trim().isEmpty()) uid = doc.getId();
+                            a.setUserId(uid);
+                            a.setId(doc.getId());
+                            existing.put(uid, a);
+                        }
+                    }
 
-                if (wasOnThisTemplate && !stillSelected) {
-                    DocumentReference ref = itemsCol.document(uid);
-                    batch.delete(ref);
-                }
-            }
+                    // 4) Normalize selected list (trim / remove empty)
+                    ArrayList<String> selected = new ArrayList<>();
+                    if (selectedUserIds != null) {
+                        for (String uid : selectedUserIds) {
+                            if (uid != null) {
+                                String t = uid.trim();
+                                if (!t.isEmpty()) selected.add(t);
+                            }
+                        }
+                    }
 
-            // 2) Upsert selected users to THIS template (moves them automatically)
-            for (String uid : selected) {
-                DocumentReference ref = itemsCol.document(uid);
+                    // 5) Delete users that were on THIS template but are now unselected
+                    for (String uid : existing.keySet()) {
+                        ShiftAssignment a = existing.get(uid);
+                        if (a == null) continue;
 
-                HashMap<String, Object> data = new HashMap<>();
-                data.put("userId", uid);
-                data.put("templateId", template.getId());
-                data.put("templateTitle", template.getTitle() == null ? "" : template.getTitle());
-                data.put("startHour", template.getStartHour());
-                data.put("endHour", template.getEndHour());
-                data.put("createdAt", FieldValue.serverTimestamp());
+                        boolean wasOnThisTemplate = template.getId().equals(a.getTemplateId());
+                        boolean stillSelected = selected.contains(uid);
 
-                batch.set(ref, data);
-            }
+                        if (wasOnThisTemplate && !stillSelected) {
+                            DocumentReference ref = itemsCol.document(uid);
+                            batch.delete(ref);
+                        }
+                    }
 
-            batch.commit().addOnCompleteListener(t ->
-                    cb.onComplete(t.isSuccessful(), t.isSuccessful() ? "Saved" : "Failed to save")
-            );
-        }).addOnFailureListener(e -> cb.onComplete(false, e.getMessage() == null ? "Failed to load assignments" : e.getMessage()));
+                    // 6) Upsert selected users to THIS template (moves them automatically)
+                    for (String uid : selected) {
+                        DocumentReference ref = itemsCol.document(uid);
+
+                        HashMap<String, Object> data = new HashMap<>();
+                        data.put("userId", uid);
+                        data.put("templateId", template.getId());
+                        data.put("templateTitle", template.getTitle() == null ? "" : template.getTitle());
+                        data.put("startHour", template.getStartHour());
+                        data.put("endHour", template.getEndHour());
+                        data.put("createdAt", FieldValue.serverTimestamp());
+
+                        batch.set(ref, data, SetOptions.merge());
+                    }
+
+                    // 7) Commit
+                    batch.commit()
+                            .addOnSuccessListener(unused ->
+                                    cb.onComplete(true, "Saved")
+                            )
+                            .addOnFailureListener(e ->
+                                    cb.onComplete(false, e.getMessage() == null ? "Failed to save" : e.getMessage())
+                            );
+
+                })
+                .addOnFailureListener(e ->
+                        cb.onComplete(false, e.getMessage() == null ? "Failed to load assignments" : e.getMessage())
+                );
     }
+
 }

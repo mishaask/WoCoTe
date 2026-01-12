@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.example.workconnect.ui.manager.ManageShiftTemplatesActivity;
 import com.example.workconnect.ui.employee.MyShiftsActivity;
 
@@ -32,6 +33,9 @@ public class ManagerHomeActivity extends AppCompatActivity {
 
     // ===== Management =====
     private Button btnApproveUsers, btnVacationRequests, btnManageAttendance, btnManageShifts, btnSalarySlips, btnCompanySettings;
+
+    // NEW
+    private Button btnSwapApprovals;
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
@@ -83,6 +87,8 @@ public class ManagerHomeActivity extends AppCompatActivity {
         btnEditEmployeeProfile = findViewById(R.id.btn_edit_employee_profile);
         btnTeams = findViewById(R.id.btn_teams);
 
+        // NEW
+        btnSwapApprovals = findViewById(R.id.btn_swap_approvals);
     }
 
     private void setClickListeners() {
@@ -105,8 +111,6 @@ public class ManagerHomeActivity extends AppCompatActivity {
         });
 
         btnMyShifts.setOnClickListener(v -> openMyShiftsOrFullTime());
-
-
 
         btnMyVacations.setOnClickListener(v -> {
             // אם VacationRequestsActivity מיועד רק לעובד – תשני למסך של "My vacations" אצלך
@@ -132,7 +136,6 @@ public class ManagerHomeActivity extends AppCompatActivity {
             Intent intent = new Intent(ManagerHomeActivity.this, MyProfileActivity.class);
             startActivity(intent);
         });
-
 
         // ===== Management =====
 
@@ -161,6 +164,11 @@ public class ManagerHomeActivity extends AppCompatActivity {
             startActivity(i);
         });
 
+        // NEW: Swap approvals
+        // (For now, it opens ScheduleShiftsActivity with a flag, so it COMPILES today.
+        // Later we’ll create SwapApprovalsActivity and change this to openWithCompany(SwapApprovalsActivity.class).)
+        btnSwapApprovals.setOnClickListener(v -> openWithCompany(SwapApprovalsActivity.class));
+
 
         btnSalarySlips.setOnClickListener(v -> {
             // TODO: startActivity(new Intent(this, ManageSalarySlipsActivity.class).putExtra("companyId", companyId));
@@ -175,7 +183,6 @@ public class ManagerHomeActivity extends AppCompatActivity {
         btnEditEmployeeProfile.setOnClickListener(v -> openWithCompany(EditEmployeeProfileActivity.class));
 
         btnTeams.setOnClickListener(v -> openWithCompany(TeamsActivity.class));
-
     }
 
     /**
@@ -244,7 +251,6 @@ public class ManagerHomeActivity extends AppCompatActivity {
                 });
     }
 
-
     private void loadCompanyDetails(String companyId) {
         db.collection("companies")
                 .document(companyId)
@@ -264,6 +270,7 @@ public class ManagerHomeActivity extends AppCompatActivity {
                         tvCompanyName.setText("Company: " + companyId)
                 );
     }
+
     private void openMyShiftsOrFullTime() {
         String uid = FirebaseAuth.getInstance().getUid();
         if (uid == null) {
@@ -288,5 +295,4 @@ public class ManagerHomeActivity extends AppCompatActivity {
                         Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
                 );
     }
-
 }

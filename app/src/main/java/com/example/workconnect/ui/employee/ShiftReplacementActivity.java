@@ -1,25 +1,21 @@
 package com.example.workconnect.ui.employee;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.DatePicker;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.view.ViewGroup;
-
-import androidx.annotation.NonNull;
 
 import com.example.workconnect.R;
 import com.example.workconnect.adapters.MyRequestsAdapter;
@@ -67,7 +63,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
 
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             myUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            myName = FirebaseAuth.getInstance().getCurrentUser().getEmail(); // fallback
+            myName = FirebaseAuth.getInstance().getCurrentUser().getEmail();
         }
 
         spinnerTeam = findViewById(R.id.spinner_team);
@@ -156,7 +152,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
         });
     }
 
-    // Expire on shift-day
     private List<ShiftSwapRequest> expireIfNeeded(List<ShiftSwapRequest> in) {
         if (in == null) return new ArrayList<>();
         String today = todayKey();
@@ -166,7 +161,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
             if (r == null) continue;
             if (r.getDateKey() != null && r.getStatus() != null && ShiftSwapRequest.OPEN.equals(r.getStatus())) {
                 if (r.getDateKey().compareTo(today) <= 0) {
-                    // expire silently
                     if (selectedTeamId != null && r.getId() != null) {
                         swapRepo.expireRequest(companyId, selectedTeamId, r.getId());
                     }
@@ -207,7 +201,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                 .setPositiveButton("Submit", null)
                 .create();
 
-        // Load upcoming shifts for this user (team already chosen)
         swapRepo.listenMyUpcomingShifts(
                 companyId,
                 java.util.Collections.singletonList(selectedTeamId),
@@ -217,7 +210,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
             boolean empty = (list == null || list.isEmpty());
             tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         });
-
 
         dlg.setOnShowListener(d -> {
             Button submit = dlg.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -251,35 +243,70 @@ public class ShiftReplacementActivity extends AppCompatActivity {
     }
 
     private void showMakeOfferDialog(ShiftSwapRequest r) {
-        if (r == null) return;
+        if (r == null || selectedTeamId == null) return;
 
+        // -------------------------
+        // GIVE_UP: only if FREE that day + auto-send to manager approval
+        // -------------------------
         if (ShiftSwapRequest.GIVE_UP.equals(r.getType())) {
-            new AlertDialog.Builder(this)
-                    .setMessage("Offer to take this shift?\n" + r.getDateKey() + " / " + r.getTemplateTitle())
-                    .setNegativeButton("Cancel", (d,w)->d.dismiss())
-                    .setPositiveButton("Offer", (d,w)-> {
-                        ShiftSwapOffer o = new ShiftSwapOffer();
-                        o.setOfferedByUid(myUid);
-                        o.setOfferedByName(myName);
-                        o.setOfferedDateKey(null);
-                        o.setOfferedTemplateId(null);
-                        o.setOfferedTemplateTitle(null);
 
-                        swapRepo.makeOffer(companyId, selectedTeamId, r.getId(), o, (ok,msg) ->
-                                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                        );
-                    })
-                    .show();
+            // MUST be free that day (in this team)
+            swapRepo.hasMyShiftOnDate(companyId, selectedTeamId, r.getDateKey(), myUid, (ok, msg) -> {
+                if (!ok) {
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if ("HAS_SHIFT".equals(msg)) {
+                    Toast.makeText(this, "You already have a shift on that day.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                new AlertDialog.Builder(this)
+                        .setMessage("Offer to take this shift?\n" + r.getDateKey() + " / " + r.getTemplateTitle())
+                        .setNegativeButton("Cancel", (d,w)->d.dismiss())
+                        .setPositiveButton("Offer", (d,w)-> {
+
+                            ShiftSwapOffer o = new ShiftSwapOffer();
+                            o.setOfferedByUid(myUid);
+                            o.setOfferedByName(myName);
+                            o.setOfferedDateKey(null);
+                            o.setOfferedTemplateId(null);
+                            o.setOfferedTemplateTitle(null);
+
+                            // Create offer
+                            swapRepo.makeOffer(companyId, selectedTeamId, r.getId(), o, (ok2, msg2) -> {
+                                Toast.makeText(this, msg2, Toast.LENGTH_SHORT).show();
+                                if (!ok2) return;
+
+                                // AUTO submit to manager approval (so it shows in SwapApprovals)
+                                swapRepo.submitForApproval(companyId, selectedTeamId, r.getId(), o.getId(), (ok3, msg3) -> {
+                                    if (!TextUtils.isEmpty(msg3)) {
+                                        Toast.makeText(this, msg3, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            });
+                        })
+                        .show();
+            });
+
             return;
         }
 
+        // -------------------------
+        // SWAP: picker of MY upcoming shifts (no manual typing)
+        // -------------------------
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_make_offer_swap, null);
-        EditText etDate = view.findViewById(R.id.et_offer_date);
-        EditText etTemplateId = view.findViewById(R.id.et_offer_template_id);
-        EditText etTemplateTitle = view.findViewById(R.id.et_offer_template_title);
 
-        etDate.setFocusable(false);
-        etDate.setOnClickListener(v -> pickDate(etDate));
+        RecyclerView rv = view.findViewById(R.id.rv_upcoming_shifts);
+        View tvEmpty = view.findViewById(R.id.tv_empty);
+        android.widget.TextView tvSelected = view.findViewById(R.id.tv_selected);
+
+        rv.setLayoutManager(new LinearLayoutManager(this));
+        UpcomingShiftPickerAdapter pickerAdapter = new UpcomingShiftPickerAdapter(s -> {
+            if (s == null) return;
+            tvSelected.setText("Selected: " + s.dateKey + " / " + safe(s.templateTitle));
+        });
+        rv.setAdapter(pickerAdapter);
 
         AlertDialog dlg = new AlertDialog.Builder(this)
                 .setTitle("Make Swap Offer")
@@ -288,22 +315,47 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                 .setPositiveButton("Offer", null)
                 .create();
 
+        // Load upcoming shifts for this user
+        swapRepo.listenMyUpcomingShifts(
+                companyId,
+                java.util.Collections.singletonList(selectedTeamId),
+                myUid
+        ).observe(this, list -> {
+            // Filter out:
+            // - same day as request (must be different day)
+            // - anything not strictly future (repo already does future, but keep safe)
+            List<ShiftSwapRepository.UpcomingShift> filtered = new ArrayList<>();
+            String today = todayKey();
+
+            if (list != null) {
+                for (ShiftSwapRepository.UpcomingShift s : list) {
+                    if (s == null || s.dateKey == null) continue;
+                    if (s.dateKey.compareTo(today) <= 0) continue;
+                    if (s.dateKey.equals(r.getDateKey())) continue;
+                    filtered.add(s);
+                }
+            }
+
+            pickerAdapter.setItems(filtered);
+            boolean empty = filtered.isEmpty();
+            tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        });
+
         dlg.setOnShowListener(d -> {
             Button b = dlg.getButton(AlertDialog.BUTTON_POSITIVE);
             b.setOnClickListener(v -> {
-                String dateKey = etDate.getText() == null ? "" : etDate.getText().toString().trim();
-                String templateId = etTemplateId.getText() == null ? "" : etTemplateId.getText().toString().trim();
-                String title = etTemplateTitle.getText() == null ? "" : etTemplateTitle.getText().toString().trim();
-
-                if (TextUtils.isEmpty(dateKey) || TextUtils.isEmpty(templateId)) {
-                    Toast.makeText(this, "Offer date + templateId required", Toast.LENGTH_SHORT).show();
+                ShiftSwapRepository.UpcomingShift chosen = pickerAdapter.getSelected();
+                if (chosen == null) {
+                    Toast.makeText(this, "Pick one of your upcoming shifts", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (dateKey.compareTo(todayKey()) <= 0) {
+
+                // extra sanity checks
+                if (chosen.dateKey.compareTo(todayKey()) <= 0) {
                     Toast.makeText(this, "Offered shift must be future", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (dateKey.equals(r.getDateKey())) {
+                if (chosen.dateKey.equals(r.getDateKey())) {
                     Toast.makeText(this, "Offer must be on a different day", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -311,9 +363,9 @@ public class ShiftReplacementActivity extends AppCompatActivity {
                 ShiftSwapOffer o = new ShiftSwapOffer();
                 o.setOfferedByUid(myUid);
                 o.setOfferedByName(myName);
-                o.setOfferedDateKey(dateKey);
-                o.setOfferedTemplateId(templateId);
-                o.setOfferedTemplateTitle(TextUtils.isEmpty(title) ? templateId : title);
+                o.setOfferedDateKey(chosen.dateKey);
+                o.setOfferedTemplateId(chosen.templateId);
+                o.setOfferedTemplateTitle(TextUtils.isEmpty(chosen.templateTitle) ? chosen.templateId : chosen.templateTitle);
 
                 swapRepo.makeOffer(companyId, selectedTeamId, r.getId(), o, (ok,msg) ->
                         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
@@ -325,6 +377,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
 
         dlg.show();
     }
+
     private String safe(String s) {
         return (s == null ? "" : s);
     }
@@ -397,6 +450,7 @@ public class ShiftReplacementActivity extends AppCompatActivity {
             }
         }
     }
+
     private void showRequestDetails(ShiftSwapRequest r) {
         swapRepo.listenOffers(companyId, selectedTeamId, r.getId()).observe(this, offers -> {
             StringBuilder sb = new StringBuilder();
@@ -441,16 +495,6 @@ public class ShiftReplacementActivity extends AppCompatActivity {
 
             dlg.show();
         });
-    }
-
-    private void pickDate(EditText target) {
-        Calendar c = Calendar.getInstance();
-        new DatePickerDialog(this, (DatePicker view, int year, int month, int dayOfMonth) -> {
-            int m = month + 1;
-            String mm = (m < 10 ? "0" : "") + m;
-            String dd = (dayOfMonth < 10 ? "0" : "") + dayOfMonth;
-            target.setText(year + "-" + mm + "-" + dd);
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
     }
 
     private String todayKey() {

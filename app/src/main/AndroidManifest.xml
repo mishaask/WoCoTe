@@ -3,8 +3,26 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    
+    <!-- Agora RTC permissions -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    
+    <!-- Location permissions -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    
+    <!-- Features -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
+        android:name=".WorkConnectApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -14,10 +32,23 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WorkConnect">
 
+
+        <!-- Chat -->
+        <activity android:name=".ui.chat.ChatListActivity" android:exported="false" />
+        <activity android:name=".ui.chat.ChatActivity" android:exported="false" />
+        <activity
+            android:name=".ui.chat.CallActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:supportsPictureInPicture="true"
+            android:launchMode="singleTop" />
         <!-- Auth & register screens -->
         <activity android:name=".ui.auth.RegisterTypeActivity" />
         <activity android:name=".ui.auth.RegisterCompanyActivity" />
         <activity android:name=".ui.auth.RegisterEmployeeActivity" />
+        <activity android:name=".ui.chat.CreateGroupActivity" />
+        <activity android:name=".ui.chat.GroupInfoActivity" />
+        <activity android:name=".ui.chat.AddMembersActivity" />
 
         <!-- Login is the launcher activity -->
         <activity
@@ -30,65 +61,78 @@
         </activity>
 
         <activity
-            android:name=".ui.manager.ManagerHomeActivity"
+            android:name=".ui.home.HomeActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.employee.EmployeeHomeActivity"
+            android:name=".ui.auth.PendingEmployeesActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.manager.PendingEmployeesActivity"
+            android:name=".ui.vacations.VacationRequestsActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.employee.VacationRequestsActivity"
+            android:name=".ui.vacations.NewVacationRequestActivity"
+            android:exported="false" />
+
+        <activity android:name=".ui.vacations.PendingVacationRequestsActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.employee.NewVacationRequestActivity"
-            android:exported="false" />
-
-        <activity android:name=".ui.manager.PendingVacationRequestsActivity"
-            android:exported="false" />
-
-        <activity android:name=".ui.employee.MyProfileActivity"
+            android:name=".ui.auth.CompleteManagerProfileActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.manager.CompleteManagerProfileActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.manager.EditEmployeeProfileActivity"
+            android:name=".ui.auth.EditEmployeeProfileActivity"
             android:exported="false"/>
         <activity
-            android:name=".ui.manager.TeamsActivity"
+            android:name=".ui.auth.TeamsActivity"
             android:exported="false"/>
         <activity
-            android:name=".ui.manager.EditTeamActivity"
+            android:name=".ui.auth.EditTeamActivity"
             android:exported="false"/>
         <activity
-            android:name=".ui.employee.MyShiftsActivity"
+            android:name=".ui.shifts.MyShiftsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.manager.ScheduleShiftsActivity"
+            android:name=".ui.shifts.ScheduleShiftsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.manager.ManageShiftTemplatesActivity"
+            android:name=".ui.shifts.ManageShiftTemplatesActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.employee.MyAvailabilityActivity"
+            android:name=".ui.shifts.MyAvailabilityActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.employee.ShiftReplacementActivity"
+            android:name=".ui.shifts.ShiftReplacementActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.manager.SwapApprovalsActivity"
+            android:name=".ui.shifts.SwapApprovalsActivity"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.attendance.AttendanceActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.company.CompanySettingsActivity"
+            android:exported="false" />
+
+        <activity android:name=".ui.auth.CompleteGoogleProfileActivity"
+            android:exported="false" />
+
+        <activity android:name=".ui.notifications.NotificationsActivity"
             android:exported="false"/>
 
 
+        <!-- Call Foreground Service -->
+        <service
+            android:name=".services.CallForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
 
     </application>
 </manifest>
